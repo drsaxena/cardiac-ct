@@ -1,0 +1,369 @@
+PROC IMPORT DATAFILE= "C:\Users\risaxena\OneDrive - University of Texas Medical Branch\Desktop\galveston_ct.xlsx" 
+    OUT= gal_ct
+	DBMS=xlsx REPLACE;
+GETNAMES=YES;
+RUN;
+libname c_Ct "C:\Users\risaxena\OneDrive - University of Texas Medical Branch\Desktop\c_ct";
+run;
+proc print data=gal_ct; run;
+
+PROC IMPORT DATAFILE= "C:\Users\risaxena\OneDrive - University of Texas Medical Branch\Desktop\clc_ct.xlsx" 
+    OUT= clc_ct
+	DBMS=xlsx REPLACE;
+GETNAMES=YES;
+RUN;
+libname c_Ct "C:\Users\risaxena\OneDrive - University of Texas Medical Branch\Desktop\c_ct";
+run;
+proc print data=clc_ct; run;
+
+
+
+
+/*GALVESTON*/
+PROC FREQ data=gal_ct;
+tables gender2;
+run;
+
+PROC MEANS DATA=gal_ct MEDIAN Q1 Q3;
+var CALCIUM2;
+run;
+
+
+/*HISTOGRAM FOR AGE*/
+proc sgplot data=gal_ct;
+histogram age1;
+run;
+
+/*bmi histogram*/
+proc sgplot data=gal_ct;
+histogram bmi2;
+run;
+
+
+
+/*CHECK NORMALITY OF CALCIUM 1,2
+CTA 1,2*/
+
+PROC SGPLOT DATA=gal_ct;
+histogram calcium2; run;
+
+proc univariate data=gal_ct normal;
+    var calcium1;
+    histogram calcium1 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run; /*CALCIUM1 NOT NORMAL= Kolmogorov–Smirnov	D = 0.31	< 0.010	Reject normality
+Cramer–von Mises	W² = 1.76	< 0.005	Reject normality
+Anderson–Darling	A² = 9.59	< 0.005	Reject normality
+*/
+
+proc univariate data=gal_ct normal;
+    var calcium2;
+    histogram calcium2 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run; /*Goodness-of-Fit Tests for Normal Distribution 
+Test Statistic p Value 
+Kolmogorov-Smirnov D 0.23925183 Pr > D <0.010 
+Cramer-von Mises W-Sq 0.37160351 Pr > W-Sq <0.005 
+Anderson-Darling A-Sq 2.04412844 Pr > A-Sq <0.005 
+not normal*/
+
+PROC SGPLOT DATA=GAL_CT;
+HISTOGRAM cta1; run;
+proc univariate data=gal_ct normal;
+    var cta1;
+    histogram cta1 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run;/*NORMAL*/
+
+PROC SGPLOT DATA=GAL_CT;
+HISTOGRAM cta2; run;
+proc univariate data=gal_ct normal;
+    var cta2;
+    histogram cta2 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run;/*NORMAL*/
+
+/*CHECK FOR BMI 1 AND 2*/
+PROC SGPLOT DATA=GAL_CT;
+HISTOGRAM bmi1; run;
+proc univariate data=gal_ct normal;
+    var BMI1;
+    histogram BMI1 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run;/*NOT NORMAL*/
+
+PROC SGPLOT DATA=GAL_CT;
+HISTOGRAM bmi2; run;
+proc univariate data=gal_ct normal;
+    var BMI2;
+    histogram BMI2 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run; /*NORMAL*/
+
+
+/*CALCIUM 1,2 NOT NORMAL- WILCOXON RANK*/
+data calcium_long;
+    set gal_ct;
+    group = "calcium1"; calcium = calcium1; output;
+    group = "calcium2"; calcium = calcium2; output;
+run;
+proc npar1way data=calcium_long wilcoxon;
+    class group;
+    var calcium;
+    title "Mann–Whitney U Test: Calcium1 vs Calcium2 (Independent Samples)";
+run;
+
+/*CTA 1,2 NORMAL- T TEST*/
+
+data cta_long;
+    set gal_ct;
+    group = "cta1"; cta = cta1; output;
+    group = "cta2"; cta = cta2; output;
+run;
+
+proc ttest data=cta_long;
+    class group;
+    var cta;
+    title "Independent Two-Sample t-Test: CTA1 vs CTA2";
+run;
+proc print data=cta_long; run;
+
+
+/****************************************/
+/*correlation test for 
+
+
+/*BMI WITH CALCIUM BEFORE*/
+proc corr data=gal_ct spearman;
+    var bmi1;
+    with calcium1;
+    title "Correlation of BMI with Calcium and CTA (Pre-intervention)";
+run;
+
+
+/*BMI WITH CALCIUM AFTER*/
+proc corr data=gal_ct spearman;
+    var bmi2;
+    with calcium2;
+    title "Correlation of BMI with Calcium and CTA (Pre-intervention)";
+run;
+
+
+/*BMI WITH CTA BEFORE*/
+proc corr data=gal_ct spearman;
+    var bmi1;
+    with cta1;
+    title "Correlation of BMI with Calcium and CTA (Pre-intervention)";
+run;
+
+/*BMI WITH CTA AFTER*/
+proc corr data=gal_ct pearson;
+    var bmi2;
+    with cta2;
+    title "Correlation of BMI with Calcium and CTA (Pre-intervention)";
+run;
+
+/*
+
+/*SCATTER PLOT*/
+
+data calcium_long;
+    set gal_ct;
+    obs_id = _N_; /* Creates unique subject ID */
+
+    calcium = calcium1; time = "Pre"; output;
+    calcium = calcium2; time = "Post"; output;
+run;
+proc sgplot data=calcium_long;
+    scatter y=calcium x=obs_id / group=time markerattrs=(symbol=circlefilled);
+    xaxis label="Observation Number";
+    yaxis label="Calcium Score";
+    title "Calcium1 vs Calcium2 by Observation (Horizontal)";
+run;
+
+data cta_long;
+set gal_ct;
+obs_id=_N_;
+cta=cta1; time= "Pre"; output;
+cta=cta2; time= "Post"; output;
+run;
+
+proc sgplot data=cta_long;
+scatter y=cta x=obs_id/ group=time markerattrs=(symbol=circlefilled);
+xaxis label="Observation Number";
+Yaxis label="CTA";
+RUN;
+
+
+
+/********************************************
+*********************************************
+********************************************/
+/*clc
+*/
+
+
+
+/*clc*/
+PROC FREQ data=clc_ct;
+tables gender2;
+run;
+
+
+PROC MEANS DATA=CLC_ct MEDIAN Q1 Q3;
+var CTA2;
+run;
+
+/*HISTOGRAM*/
+proc sgplot data=CLC_ct;
+histogram CTA2;
+run;
+
+
+
+
+/*CHECK NORMALITY OF CALCIUM 1,2
+CTA 1,2*/
+
+PROC SGPLOT DATA=CLC_ct;
+histogram calcium1; run;
+
+proc univariate data=CLC_ct normal;
+    var calcium1;
+    histogram calcium1 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run; 
+
+proc univariate data=clc_ct normal;
+    var calcium2;
+    histogram calcium2 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run; 
+
+PROC SGPLOT DATA=clc_CT;
+HISTOGRAM cta1; run;
+proc univariate data=clc_ct normal;
+    var cta1;
+    histogram cta1 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run;/*NORMAL*/
+
+PROC SGPLOT DATA=clc_CT;
+HISTOGRAM cta2; run;
+proc univariate data=clc_ct normal;
+    var cta2;
+    histogram cta2 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run;/*NORMAL*/
+
+/*CHECK FOR BMI 1 AND 2*/
+PROC SGPLOT DATA=clc_CT;
+HISTOGRAM bmi1; run;
+proc univariate data=clc_ct normal;
+    var BMI1;
+    histogram BMI1 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run;/*NOT NORMAL*/
+
+PROC SGPLOT DATA=clc_CT;
+HISTOGRAM bmi2; run;
+proc univariate data=clc_ct normal;
+    var BMI2;
+    histogram BMI2 / normal;
+    inset mean std skewness kurtosis / position=ne;
+run; /*NORMAL*/
+
+
+/*CALCIUM 1,2 NOT NORMAL- WILCOXON RANK*/
+data calcium_long;
+    set clc_ct;
+    group = "calcium1"; calcium = calcium1; output;
+    group = "calcium2"; calcium = calcium2; output;
+run;
+proc npar1way data=calcium_long wilcoxon;
+    class group;
+    var calcium;
+    title "Mann–Whitney U Test: Calcium1 vs Calcium2 (Independent Samples)";
+run;
+
+/*CTA 1,2 notNORMAL- wilcoxon*/
+
+data cta_long;
+    set clc_ct;
+    group = "cta1"; cta = cta1; output;
+    group = "cta2"; cta = cta2; output;
+run;
+proc npar1way data=cta_long wilcoxon;
+    class group;
+    var cta;
+    title "Mann–Whitney U Test: Calcium1 vs Calcium2 (Independent Samples)";
+run;
+
+
+/****************************************/
+/*correlation test for 
+
+
+/*BMI WITH CALCIUM BEFORE*/
+proc corr data=CLC_ct spearman;
+    var bmi1;
+    with calcium1;
+    title "Correlation of BMI with Calcium and CTA (Pre-intervention)";
+run;
+
+
+/*BMI WITH CALCIUM AFTER*/
+proc corr data=CLC_ct spearman;
+    var bmi2;
+    with calcium2;
+    title "Correlation of BMI with Calcium and CTA (Pre-intervention)";
+run;
+
+
+/*BMI WITH CTA BEFORE*/
+proc corr data=CLC_ct spearman;
+    var bmi1;
+    with cta1;
+    title "Correlation of BMI with Calcium and CTA (Pre-intervention)";
+run;
+
+/*BMI WITH CTA AFTER*/
+proc corr data=CLC_ct spearman;
+    var bmi2;
+    with cta2;
+    title "Correlation of BMI with Calcium and CTA (Pre-intervention)";
+run;
+
+/*
+
+/*SCATTER PLOT*/
+
+data calcium_long;
+    set clc_ct;
+    obs_id = _N_; /* Creates unique subject ID */
+
+    calcium = calcium1; time = "Pre"; output;
+    calcium = calcium2; time = "Post"; output;
+run;
+proc sgplot data=calcium_long;
+    scatter y=calcium x=obs_id / group=time markerattrs=(symbol=circlefilled);
+    xaxis label="Observation Number";
+    yaxis label="Calcium Score";
+    title "Calcium score Pre vs Post QI";
+run;
+
+data cta_long;
+set clc_ct;
+obs_id=_N_;
+cta=cta1; time= "Pre"; output;
+cta=cta2; time= "Post"; output;
+run;
+
+proc sgplot data=cta_long;
+scatter y=cta x=obs_id/ group=time markerattrs=(symbol=circlefilled);
+xaxis label="Observation Number";
+Yaxis label="CTA";
+title "CTA Score Pre vs Post QI ";
+RUN;
+
+
